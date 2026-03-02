@@ -1,35 +1,33 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 import mlflow
+import pandas as pd
 from dotenv import load_dotenv
 from loguru import logger
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.utils.logging import setup_logging
 from src.utils.config_loader import preprocessing_cfg, model_cfg
-from src.preprocessing.pipeline import PreprocessingPipeline
+from src.dataset.siamese_dataset import SiamesePairDataset
+from src.utils.csv_loader import load_pairs_csv
+from src.utils.split import stratified_split
+
 load_dotenv()
 setup_logging()
 
 
 def main() -> None:
- 
-    tracking_uri = model_cfg.mlflow.tracking_uri
-    experiment_name = model_cfg.mlflow.experiment_name
-    run_tags = dict(model_cfg.mlflow.run_tags)
+    # ---------------- MLflow setup ----------------
+    mlflow.set_tracking_uri(model_cfg.mlflow.tracking_uri)
+    mlflow.set_experiment(model_cfg.mlflow.experiment_name)
 
-    mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(experiment_name)
-
-    logger.info(f"MLflow tracking URI: {tracking_uri}")
-    logger.info(f"MLflow experiment: {experiment_name}")
-
-    with mlflow.start_run(tags=run_tags) as run:
+    with mlflow.start_run(tags=dict(model_cfg.mlflow.run_tags)) as run:
         logger.info(f"MLflow run started: {run.info.run_id}")
 
         mlflow.log_params({
@@ -42,35 +40,54 @@ def main() -> None:
             "roi_output_h": preprocessing_cfg.roi_extraction.output.height,
         })
 
-        raw_dir = Path("src/data/raw")
-        image_paths = sorted(raw_dir.glob("*.png")) + sorted(raw_dir.glob("*.jpg")) \
-                    + sorted(raw_dir.glob("*.tiff")) + sorted(raw_dir.glob("*.tif")) + sorted(raw_dir.glob("*.jpeg"))
+        # ---------------- Load CSV ----------------
+        df = load_pairs_csv("/app/src/data/csv/data.csv")
+        logger.info(f"Loaded CSV with {len(df)} pairs")
 
-        if not image_paths:
-            logger.warning(f"No images found in {raw_dir}. Place raw cheque scans there to proceed.")
-        else:
-            logger.info(f"Found {len(image_paths)} raw cheque images.")
-            pipeline = PreprocessingPipeline()
-            results = pipeline.run_batch(image_paths, save_rois=True)
+        train, val, test = stratified_split(df)
 
-            
+        logger.info(
+            f"Split sizes → Train: {len(train)}, "
+            f"Val: {len(val)}, Test: {len(test)}"
+        )
 
-            succeeded = sum(1 for r in results if r.success)
-            failed = len(results) - succeeded
+        train_ds = SiamesePairDataset(train)
+        val_ds   = SiamesePairDataset(val)
+        test_ds  = SiamesePairDataset(test)
 
-            mlflow.log_metrics({
-                "preprocessing_total": len(results),
-                "preprocessing_succeeded": succeeded,
-                "preprocessing_failed": failed,
-            })
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=model_cfg.training.batch_size,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True
+        )
 
-            logger.info(
-                f"Preprocessing complete: {succeeded} succeeded, {failed} failed"
-            )
+        val_loader = DataLoader(
+            val_ds,
+            batch_size=model_cfg.training.batch_size,
+            shuffle=False,
+            num_workers=4
+        )
 
-        logger.info("Augmentation stage: TODO (handled by separate team member)")
-        logger.info("Model training stage: TODO (handled by separate team member)")
-        logger.info("Evaluation stage: TODO (handled by separate team member)")
+        test_loader = DataLoader(
+            test_ds,
+            batch_size=model_cfg.training.batch_size,
+            shuffle=False,
+            num_workers=4
+        )
+
+        logger.success("Datasets and DataLoaders initialized")
+
+        img1, img2, label = next(iter(train_loader))
+        logger.info(
+            f"Sample batch shapes → img1: {img1.shape}, img2: {img2.shape}"
+        )
+
+
+        logger.info("Model training stage: TODO")
+        logger.info("Evaluation stage: TODO")
+
         logger.success(f"Pipeline run complete. MLflow run ID: {run.info.run_id}")
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ dpi_normalization:
   resample_filter: "LANCZOS"       # PIL filter: LANCZOS | BICUBIC | BILINEAR
 
 resolution_enforcement:
-  enabled: true
+  enabled: false
   min_width: 1000
   min_height: 500
   max_width: 4000
@@ -21,7 +21,7 @@ resolution_enforcement:
   pad_color: 255               
 
 skew_correction:
-  enabled: true
+  enabled: false
   method: "projection_profile"                  # hough | projection_profile | deskew_lib
   max_skew_angle_deg: 10.0    
   hough:
@@ -69,7 +69,7 @@ noise_removal:
     iterations: 1
 
 roi_extraction:
-  enabled: true
+  enabled: false
   method: "model"            
   fixed_ratio:
     x_start: 0.50                 
