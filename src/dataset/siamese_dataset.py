@@ -12,10 +12,6 @@ class SiamesePairDataset(Dataset):
     def __init__(self, df):
         self.df = df.reset_index(drop=True)
         self.pipeline = PreprocessingPipeline()
-        self.transform = T.Compose([
-            T.Resize((224, 224))
-        ])
-
         self.raw_root = Path("src/data/raw")
         self.cache_root = Path("src/data/signatures")
 
@@ -38,8 +34,8 @@ class SiamesePairDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        img1 = self.transform(self._get_image(row.image1))
-        img2 = self.transform(self._get_image(row.image2))
+        img1 = self._get_image(row.image1)
+        img2 = self._get_image(row.image2)
         label = torch.tensor(float(row.label), dtype=torch.float32)
         return img1, img2, label
 

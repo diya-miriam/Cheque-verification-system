@@ -37,6 +37,9 @@ def train_model(model, train_loader, epochs, lr, margin, save_path):
             img1 = img1.to(device)
             img2 = img2.to(device)
             label = label.to(device)
+            logger.info(f"Image1 {img1}")
+            logger.info(f"Image2 {img2}")
+            logger.info(f"Label {label}")
 
             optimizer.zero_grad()
 
@@ -48,6 +51,7 @@ def train_model(model, train_loader, epochs, lr, margin, save_path):
             optimizer.step()
 
             total_loss += loss.item()
+            logger.info(f"Total loss: {total_loss}")
 
         avg_loss = total_loss / len(train_loader)
         logger.info(f"Epoch {epoch+1} Loss = {avg_loss:.6f}")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-
+import torch
 import mlflow
 import pandas as pd
 from dotenv import load_dotenv
@@ -92,6 +92,14 @@ def main() -> None:
         model = SiameseNetwork(
             embedding_size=training_cfg.model.embedding_size
         )
+        checkpoint = torch.load(training_cfg.paths.pretrained_model, map_location="cpu")
+
+        model.cnn.load_state_dict(checkpoint["cnn"], strict=True)
+        model.fc.load_state_dict(checkpoint["fc"], strict=True)
+
+        model.eval()
+        logger.info("✅ Model loaded successfully")
+        logger.info("Loaded parameters")
         logger.info("Starting training...")
         train_model(
             model=model,

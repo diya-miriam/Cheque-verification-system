@@ -21,7 +21,7 @@ resolution_enforcement:
   pad_color: 255               
 
 skew_correction:
-  enabled: false
+  enabled: true
   method: "projection_profile"                  # hough | projection_profile | deskew_lib
   max_skew_angle_deg: 10.0    
   hough:
@@ -80,8 +80,8 @@ roi_extraction:
     min_area: 5000
     padding_px: 10
   output:
-    width: 256
-    height: 128
+    width: 105
+    height: 105
     keep_aspect_ratio: true
     pad_color: 255
 

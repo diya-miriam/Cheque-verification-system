@@ -1,10 +1,9 @@
 training:
   epochs: 15
-  batch_size: 16
-  learning_rate: 5e-5
+  batch_size: 32
+  learning_rate: 1e-5
 
 model:
-  image_size: 105
   embedding_size: 256
 
 loss:
@@ -12,5 +11,5 @@ loss:
 
 paths:
   train_csv: "pairs_train.csv"
-  pretrained_model: "verifier_siamese.pt"
-  save_model: "verifier_finetuned.pt"
+  pretrained_model: "src/models/checkpoints/verifier_siamese.pt"
+  save_model: "src/models/checkpoints/verifier_finetuned.pt"
