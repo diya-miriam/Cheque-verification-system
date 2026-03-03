@@ -31,3 +31,4 @@ def get(config: DictConfig, key: str, default: Any = None) -> Any:
 preprocessing_cfg: DictConfig = load_config("preprocessing")
 augmentation_cfg: DictConfig = load_config("augmentation")
 model_cfg: DictConfig = load_config("model")
+training_cfg: DictConfig = load_config("training")

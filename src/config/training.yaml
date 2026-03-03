@@ -1,0 +1,16 @@
+training:
+  epochs: 15
+  batch_size: 16
+  learning_rate: 5e-5
+
+model:
+  image_size: 105
+  embedding_size: 256
+
+loss:
+  margin: 1.0
+
+paths:
+  train_csv: "pairs_train.csv"
+  pretrained_model: "verifier_siamese.pt"
+  save_model: "verifier_finetuned.pt"

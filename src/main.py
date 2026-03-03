@@ -13,10 +13,12 @@ from torch.utils.data import DataLoader
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.utils.logging import setup_logging
-from src.utils.config_loader import preprocessing_cfg, model_cfg
+from src.utils.config_loader import preprocessing_cfg, model_cfg,training_cfg
 from src.dataset.siamese_dataset import SiamesePairDataset
 from src.utils.csv_loader import load_pairs_csv
 from src.utils.split import stratified_split
+from src.models.siamese_network import SiameseNetwork
+from src.training.trainer import train_model
 
 load_dotenv()
 setup_logging()
@@ -86,8 +88,22 @@ def main() -> None:
 
 
         logger.info("Model training stage: TODO")
-        logger.info("Evaluation stage: TODO")
 
+        model = SiameseNetwork(
+            embedding_size=training_cfg.model.embedding_size
+        )
+        logger.info("Starting training...")
+        train_model(
+            model=model,
+            train_loader=train_loader,
+            epochs=training_cfg.training.epochs,
+            lr=training_cfg.training.learning_rate,
+            margin=training_cfg.loss.margin,
+            save_path=training_cfg.paths.save_model
+        )
+        logger.success("Training completed")
+
+        logger.info("Evaluation stage: TODO")
         logger.success(f"Pipeline run complete. MLflow run ID: {run.info.run_id}")
 
 if __name__ == "__main__":
