@@ -49,10 +49,6 @@ def load_image(
     return image, metadata
 
 def load_image_cv2(path: str | Path) -> np.ndarray:
-    """
-    Convenience wrapper returning only the numpy array via OpenCV.
-    Uses config color_mode automatically.
-    """
     image, _ = load_image(path)
     return image
 
@@ -66,10 +62,6 @@ def _extract_dpi(pil_img: Image.Image) -> int:
                 return dpi
     except Exception:
         pass
-    logger.warning(
-        f"DPI not found in metadata, assuming {DEFAULT_DPI} dpi "
-        f"(set via preprocessing.yaml → dpi_normalization.default_assumed_dpi)"
-    )
     return DEFAULT_DPI
 
 

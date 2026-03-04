@@ -1,5 +1,5 @@
 training:
-  epochs: 15
+  max_epochs: 30
   batch_size: 4
   learning_rate: 1e-4
 
@@ -7,9 +7,9 @@ model:
   embedding_size: 256
 
 loss:
-  margin: 1.0
+  margins: [0.5, 0.8, 1.0]
 
 paths:
-  train_csv: "pairs_train.csv"
+  train_csv: "data.csv"
   pretrained_model: "src/models/checkpoints/verifier_siamese.pt"
-  save_model: "src/models/checkpoints/verifier_finetuned.pt"
+  save_model: "src/models/checkpoints"

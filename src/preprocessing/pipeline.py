@@ -51,7 +51,6 @@ class PreprocessingPipeline:
         result = PreprocessingResult(cheque_id=cheque_id)
         timings = {}
         intermediates = {}
-        logger.info(f"[{cheque_id}] Starting preprocessing pipeline")
         try:
             # Stage 1: Load
             t = time.perf_counter()
@@ -59,35 +58,30 @@ class PreprocessingPipeline:
             timings["load"] = _ms(t)
             result.metadata = metadata
             intermediates["load"] = image.copy()
-            logger.debug(f"[{cheque_id}] Stage 1/7 LOAD {timings['load']:.1f}ms")
 
             # Stage 2: DPI Normalisation 
             t = time.perf_counter()
             image = normalize_dpi(image, source_dpi=metadata["dpi"])
             timings["dpi_normalize"] = _ms(t)
             intermediates["dpi_normalize"] = image.copy()
-            logger.debug(f"[{cheque_id}] Stage 2/7 DPI_NORMALIZE {timings['dpi_normalize']:.1f}ms")
 
             # Stage 3: Resolution Enforcement 
             t = time.perf_counter()
             image = enforce_resolution(image)
             timings["resolution"] = _ms(t)
             intermediates["resolution"] = image.copy()
-            logger.debug(f"[{cheque_id}] Stage 3/7 RESOLUTION {timings['resolution']:.1f}ms")
 
             # Stage 4: Skew Correction
             t = time.perf_counter()
             image = correct_skew(image)
             timings["skew"] = _ms(t)
             intermediates["skew"] = image.copy()
-            logger.debug(f"[{cheque_id}] Stage 4/7 SKEW {timings['skew']:.1f}ms")
 
             # Stage 5: Perspective Correction 
             t = time.perf_counter()
             image = correct_perspective(image)
             timings["perspective"] = _ms(t)
             intermediates["perspective"] = image.copy()
-            logger.debug(f"[{cheque_id}] Stage 5/7 PERSPECTIVE {timings['perspective']:.1f}ms")
 
              # Stage 8: ROI Extraction 
             t = time.perf_counter()
@@ -100,23 +94,13 @@ class PreprocessingPipeline:
             image = remove_noise(image)
             timings["noise"] = _ms(t)
             intermediates["noise"] = image.copy()
-            logger.debug(f"[{cheque_id}] Stage 7/7 NOISE {timings['noise']:.1f}ms")
             
             # Stage 6: Background Removal
             t = time.perf_counter()
             image = remove_background(image)
             timings["background"] = _ms(t)
             intermediates["background"] = image.copy()
-            logger.debug(f"[{cheque_id}] Stage 6/7 BACKGROUND {timings['background']:.1f}ms")
-
-           
-
-            total = sum(timings.values())
-            logger.success(
-                f"[{cheque_id}] Pipeline complete in {total:.1f}ms | "
-                f"ROI shape: {image.shape}"
-            )
-
+ 
             result.roi = image
             result.stage_times_ms = timings
 

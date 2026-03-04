@@ -25,7 +25,6 @@ setup_logging()
 
 
 def main() -> None:
-    # ---------------- MLflow setup ----------------
     mlflow.set_tracking_uri(model_cfg.mlflow.tracking_uri)
     mlflow.set_experiment(model_cfg.mlflow.experiment_name)
 
@@ -42,7 +41,6 @@ def main() -> None:
             "roi_output_h": preprocessing_cfg.roi_extraction.output.height,
         })
 
-        # ---------------- Load CSV ----------------
         df = load_pairs_csv("/app/src/data/csv/data.csv")
         logger.info(f"Loaded CSV with {len(df)} pairs")
 
@@ -86,8 +84,7 @@ def main() -> None:
             f"Sample batch shapes → img1: {img1.shape}, img2: {img2.shape}"
         )
 
-
-        logger.info("Model training stage: TODO")
+        logger.info("Model training stage")
 
         model = SiameseNetwork(
             embedding_size=training_cfg.model.embedding_size
@@ -98,20 +95,26 @@ def main() -> None:
         model.fc.load_state_dict(checkpoint["fc"], strict=True)
 
         model.eval()
-        logger.info("✅ Model loaded successfully")
-        logger.info("Loaded parameters")
-        logger.info("Starting training...")
-        train_model(
-            model=model,
-            train_loader=train_loader,
-            epochs=training_cfg.training.epochs,
-            lr=training_cfg.training.learning_rate,
-            margin=training_cfg.loss.margin,
-            save_path=training_cfg.paths.save_model
-        )
-        logger.success("Training completed")
 
-        logger.info("Evaluation stage: TODO")
+        margins = training_cfg.loss.margins
+        for margin in margins:
+            logger.info(f"Starting training {margin}"
+                        f"max_epocs : {training_cfg.training.max_epochs}"
+                        f"learning rate : {training_cfg.training.learning_rate}")
+            
+            save_path = f"{training_cfg.paths.save_model}/model_margin_{margin}.pt"
+            train_model(
+                model=model,
+                train_loader=train_loader,
+                test_loader=test_loader,
+                val_loader=val_loader,
+                epochs=training_cfg.training.max_epochs,
+                lr=training_cfg.training.learning_rate,
+                margin=margin,
+                save_path=save_path
+            )
+            
+        logger.success("Training completed")
         logger.success(f"Pipeline run complete. MLflow run ID: {run.info.run_id}")
 
 if __name__ == "__main__":
