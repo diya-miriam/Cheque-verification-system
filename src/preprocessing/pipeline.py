@@ -17,7 +17,7 @@ from typing import Optional
 import numpy as np
 from loguru import logger
 
-from src.utils.config_loader import preprocessing_cfg as cfg
+from src.utils.config_loader import preprocessing_cfg, refsig_preprocessing
 from src.preprocessing.load_image import load_image
 from src.preprocessing.dpi_normalization import normalize_dpi
 from src.preprocessing.resolution_enforcement import enforce_resolution
@@ -39,11 +39,20 @@ class PreprocessingResult:
     error: Optional[str] = None
 
 class PreprocessingPipeline:
-    SAVE_INTERMEDIATES: bool = cfg.output.save_intermediates
-    INTERMEDIATE_DIR: str = cfg.output.intermediate_dir
+    # SAVE_INTERMEDIATES: bool = cfg.output.save_intermediates
+    # INTERMEDIATE_DIR: str = cfg.output.intermediate_dir
 
-    def __init__(self):
-        logger.info("PreprocessingPipeline initialised with config from preprocessing.yaml")
+    def __init__(self, use_reference: bool = False):
+        global cfg
+        if use_reference:
+            cfg=refsig_preprocessing
+            logger.info("PreprocessingPipeline initialised with config from reference_signature_preprocessing.yaml")
+        else:
+            cfg = preprocessing_cfg
+            logger.info("PreprocessingPipeline initialised with config from preprocessing.yaml")
+        
+        self.SAVE_INTERMEDIATES = cfg.output.save_intermediates
+        self.INTERMEDIATE_DIR = cfg.output.intermediate_dir
 
     def run(self, image_path: str | Path, cheque_id: Optional[str] = None) -> PreprocessingResult:
         image_path = Path(image_path)
