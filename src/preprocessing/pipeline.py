@@ -42,7 +42,7 @@ class PreprocessingPipeline:
     # SAVE_INTERMEDIATES: bool = cfg.output.save_intermediates
     # INTERMEDIATE_DIR: str = cfg.output.intermediate_dir
 
-    def __init__(self, use_reference: bool = False):
+    def __init__(self, use_reference):
         global cfg
         if use_reference:
             cfg=refsig_preprocessing

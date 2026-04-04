@@ -37,8 +37,8 @@ st.set_page_config(
 # ------------------------------------------------------------
 # Model / threshold config
 # ------------------------------------------------------------
-MODEL_PATH = PROJECT_ROOT / "src" / "models" / "checkpoints" / "model_margin_0.5.pt"
-THRESHOLD = 0.8
+MODEL_PATH = PROJECT_ROOT / "src" / "models" / "checkpoints" / "model_margin_1.0.pt"
+THRESHOLD = 0.75
 TARGET_SIZE = 256  # matches SiamesePairDataset
 
 # ------------------------------------------------------------
@@ -47,7 +47,7 @@ TARGET_SIZE = 256  # matches SiamesePairDataset
 
 @st.cache_resource
 def get_cheque_pipeline():
-    return PreprocessingPipeline()
+    return PreprocessingPipeline(use_reference=False)
 
 @st.cache_resource
 def get_reference_pipeline():
@@ -122,35 +122,35 @@ def extract_signature_roi_from_cheque(uploaded_cheque) -> Image.Image:
     return roi_pil
 
 
-def preprocess_reference_signature(uploaded_ref) -> Image.Image:
-    """
-    Uses the reference-signature preprocessing pipeline
-    based on reference_signature_preprocessing.yaml.
-    """
-    pipeline = get_reference_pipeline()
+# def preprocess_reference_signature(uploaded_ref) -> Image.Image:
+#     """
+#     Uses the reference-signature preprocessing pipeline
+#     based on reference_signature_preprocessing.yaml.
+#     """
+#     # pipeline = get_reference_pipeline()
 
-    suffix = Path(uploaded_ref.name).suffix.lower()
-    if suffix not in [".png", ".jpg", ".jpeg"]:
-        suffix = ".png"
+#     suffix = Path(uploaded_ref.name).suffix.lower()
+#     if suffix not in [".png", ".jpg", ".jpeg"]:
+#         suffix = ".png"
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(uploaded_ref.getvalue())
-        tmp_path = tmp.name
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+#         tmp.write(uploaded_ref.getvalue())
+#         tmp_path = tmp.name
 
-    result = pipeline.run(tmp_path)
+#     # result = pipeline.run(tmp_path)
 
-    if not result.success or result.roi is None:
-        raise RuntimeError(
-            result.error or "Reference signature preprocessing failed."
-        )
+#     if not result.success or result.roi is None:
+#         raise RuntimeError(
+#             result.error or "Reference signature preprocessing failed."
+#         )
 
-    ref_np = result.roi
+#     ref_np = result.roi
 
-    if ref_np.ndim == 3:
-        ref_np = ref_np[:, :, 0]
+#     if ref_np.ndim == 3:
+#         ref_np = ref_np[:, :, 0]
 
-    ref_pil = Image.fromarray(ref_np.astype(np.uint8), mode="L")
-    return ref_pil
+#     ref_pil = Image.fromarray(ref_np.astype(np.uint8), mode="L")
+#     return ref_pil
 # ------------------------------------------------------------
 # Verification logic
 # Matches YOUR evaluate_result.py exactly
@@ -264,7 +264,7 @@ if verify_btn:
 
             # 2) Reference signature -> direct image load only
             # 2) Reference signature -> reference preprocessing pipeline
-            ref_pil = preprocess_reference_signature(ref_file)
+            # ref_pil = preprocess_reference_signature(ref_file)
 
             # 3) Verification
             distance, label = verify_signature(roi_pil, ref_pil)

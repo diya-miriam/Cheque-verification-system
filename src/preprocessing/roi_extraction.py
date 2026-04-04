@@ -142,6 +142,7 @@ def _model_based_roi(image):
     x1, y1, x2, y2 = boxes.xyxy[0].int().tolist()
     return image[y1:y2, x1:x2]
 
+
 def ensure_rgb_for_model(img: np.ndarray) -> np.ndarray:
     if img.ndim == 2:
         return np.repeat(img[:, :, None], 3, axis=2)

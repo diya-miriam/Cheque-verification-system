@@ -12,6 +12,7 @@ import torch
 
 # ------------------------------------------------------------
 # Make sure we can import src/
+
 # ------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -37,8 +38,8 @@ st.set_page_config(
 # ------------------------------------------------------------
 # Model / threshold config
 # ------------------------------------------------------------
-MODEL_PATH = PROJECT_ROOT / "src" / "models" / "checkpoints" / "model_margin_0.5.pt"
-THRESHOLD = 0.8
+MODEL_PATH = PROJECT_ROOT / "src" / "models" / "checkpoints" / "model_margin_1.0.pt"
+THRESHOLD = 0.75
 TARGET_SIZE = 256  # matches SiamesePairDataset
 
 # ------------------------------------------------------------
@@ -46,7 +47,7 @@ TARGET_SIZE = 256  # matches SiamesePairDataset
 # ------------------------------------------------------------
 @st.cache_resource
 def get_pipeline():
-    return PreprocessingPipeline()
+    return PreprocessingPipeline(use_reference=False)
 
 @st.cache_resource
 def load_verifier():
@@ -233,6 +234,7 @@ with right:
 # ------------------------------------------------------------
 # Verify click handler
 # ------------------------------------------------------------
+
 if verify_btn:
     with st.spinner("Running preprocessing pipeline and verifying signature..."):
         try:
