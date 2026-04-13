@@ -37,7 +37,7 @@ st.set_page_config(
 # ------------------------------------------------------------
 # Model / threshold config
 # ------------------------------------------------------------
-MODEL_PATH = PROJECT_ROOT / "src" / "models" / "checkpoints" / "model_margin_0.5.pt"
+MODEL_PATH = PROJECT_ROOT / "src" / "models" / "checkpoints" / "model_margin_1.0.pt"
 THRESHOLD = 0.8
 TARGET_SIZE = 256  # matches SiamesePairDataset
 
@@ -62,6 +62,25 @@ def load_verifier():
     model.eval()
     return model
 
+
+#to clean reference signature
+def clean_reference_signature(pil_img: Image.Image) -> Image.Image:
+    """
+    For reference signatures cropped from a cheque scan.
+    Applies only background removal to clean the image,
+    no full pipeline (no ROI extraction, no geometric corrections).
+    """
+    import cv2
+    from src.preprocessing.background_removal import remove_background
+
+    img_np = np.array(pil_img.convert("L"), dtype=np.uint8)
+    cleaned = remove_background(img_np)
+
+    # Handle float output from background_removal
+    if cleaned.dtype != np.uint8:
+        cleaned = (cleaned * 255).clip(0, 255).astype(np.uint8)
+
+    return Image.fromarray(cleaned, mode="L")
 # ------------------------------------------------------------
 # YOUR training-style model input preparation
 # Based on SiamesePairDataset._get_image()
@@ -236,20 +255,19 @@ with right:
 if verify_btn:
     with st.spinner("Running preprocessing pipeline and verifying signature..."):
         try:
-            # 1) Scanned cheque -> YOUR preprocessing pipeline -> extracted signature ROI
             roi_pil = extract_signature_roi_from_cheque(cheque_file)
 
-            # 2) Reference signature -> direct image load only
-            ref_pil = Image.open(ref_file).convert("RGB")
+            # Clean the reference signature before comparing
+            ref_raw = Image.open(ref_file)
+            ref_pil = clean_reference_signature(ref_raw)
 
-            # 3) Verification
             distance, label = verify_signature(roi_pil, ref_pil)
 
             st.session_state.result = {
                 "label": label,
                 "distance": distance,
                 "roi": roi_pil,
-                "ref": ref_pil,
+                "ref": ref_pil,  # show cleaned version
             }
             st.rerun()
 

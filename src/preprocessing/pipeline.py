@@ -1,10 +1,7 @@
 """
 src/preprocessing/pipeline.py
 Orchestrates the full preprocessing pipeline:
-    load → dpi_normalize → resolve → deskew → perspective → bg_remove → denoise → roi
-
-Each stage is individually toggleable via preprocessing.yaml.
-Intermediate outputs can optionally be saved for debugging.
+    load → dpi_normalize → resolution → skew → perspective → noise → background → roi
 """
 
 from __future__ import annotations
@@ -31,28 +28,27 @@ from src.preprocessing.roi_extraction import extract_roi, save_roi
 @dataclass
 class PreprocessingResult:
     cheque_id: str
-    roi: Optional[np.ndarray] = None                         
+    roi: Optional[np.ndarray] = None
     metadata: dict = field(default_factory=dict)
     stage_times_ms: dict = field(default_factory=dict)
-    intermediates: dict = field(default_factory=dict)  
+    intermediates: dict = field(default_factory=dict)
     success: bool = True
     error: Optional[str] = None
 
+
 class PreprocessingPipeline:
-    # SAVE_INTERMEDIATES: bool = cfg.output.save_intermediates
-    # INTERMEDIATE_DIR: str = cfg.output.intermediate_dir
 
     def __init__(self, use_reference: bool = False):
-        global cfg
+        # Store config on self — do NOT use global
         if use_reference:
-            cfg=refsig_preprocessing
-            logger.info("PreprocessingPipeline initialised with config from reference_signature_preprocessing.yaml")
+            self.cfg = refsig_preprocessing
+            logger.info("PreprocessingPipeline initialised with reference_signature_preprocessing.yaml")
         else:
-            cfg = preprocessing_cfg
-            logger.info("PreprocessingPipeline initialised with config from preprocessing.yaml")
-        
-        self.SAVE_INTERMEDIATES = cfg.output.save_intermediates
-        self.INTERMEDIATE_DIR = cfg.output.intermediate_dir
+            self.cfg = preprocessing_cfg
+            logger.info("PreprocessingPipeline initialised with preprocessing.yaml")
+
+        self.SAVE_INTERMEDIATES = self.cfg.output.save_intermediates
+        self.INTERMEDIATE_DIR = self.cfg.output.intermediate_dir
 
     def run(self, image_path: str | Path, cheque_id: Optional[str] = None) -> PreprocessingResult:
         image_path = Path(image_path)
@@ -60,6 +56,7 @@ class PreprocessingPipeline:
         result = PreprocessingResult(cheque_id=cheque_id)
         timings = {}
         intermediates = {}
+
         try:
             # Stage 1: Load
             t = time.perf_counter()
@@ -68,13 +65,13 @@ class PreprocessingPipeline:
             result.metadata = metadata
             intermediates["load"] = image.copy()
 
-            # Stage 2: DPI Normalisation 
+            # Stage 2: DPI Normalisation
             t = time.perf_counter()
             image = normalize_dpi(image, source_dpi=metadata["dpi"])
             timings["dpi_normalize"] = _ms(t)
             intermediates["dpi_normalize"] = image.copy()
 
-            # Stage 3: Resolution Enforcement 
+            # Stage 3: Resolution Enforcement
             t = time.perf_counter()
             image = enforce_resolution(image)
             timings["resolution"] = _ms(t)
@@ -86,30 +83,34 @@ class PreprocessingPipeline:
             timings["skew"] = _ms(t)
             intermediates["skew"] = image.copy()
 
-            # Stage 5: Perspective Correction 
+            # Stage 5: Perspective Correction
             t = time.perf_counter()
             image = correct_perspective(image)
             timings["perspective"] = _ms(t)
             intermediates["perspective"] = image.copy()
 
-             # Stage 8: ROI Extraction 
+            # Stage 6: Noise Removal
+            t = time.perf_counter()
+            image = remove_noise(image)
+            timings["noise"] = _ms(t)
+            intermediates["noise"] = image.copy()
+
+            # Stage 7: Background Removal
+            t = time.perf_counter()
+            image = remove_background(image)
+            timings["background"] = _ms(t)
+            intermediates["background"] = image.copy()
+
+            # Stage 8: ROI Extraction — LAST, on clean image
             t = time.perf_counter()
             image = extract_roi(image)
             timings["roi"] = _ms(t)
             intermediates["roi"] = image.copy()
 
-            # Stage 7: Noise Removal 
-            t = time.perf_counter()
-            image = remove_noise(image)
-            timings["noise"] = _ms(t)
-            intermediates["noise"] = image.copy()
-            
-            # Stage 6: Background Removal
-            t = time.perf_counter()
-            image = remove_background(image)
-            timings["background"] = _ms(t)
-            intermediates["background"] = image.copy()
- 
+            # Ensure uint8 output
+            if image.dtype != np.uint8:
+                image = (image * 255).clip(0, 255).astype(np.uint8)
+
             result.roi = image
             result.stage_times_ms = timings
 
@@ -149,6 +150,7 @@ class PreprocessingPipeline:
             fpath = out_dir / f"{stage}.png"
             cv2.imwrite(str(fpath), img)
         logger.debug(f"Intermediates saved to {out_dir}")
+
 
 def _ms(start: float) -> float:
     return (time.perf_counter() - start) * 1000
