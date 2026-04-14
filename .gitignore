@@ -9,8 +9,6 @@ build/
 
 
 # Models
-src/models/checkpoints/*.pt
-src/models/checkpoints/*.pth
 
 # MLflow
 mlruns/
