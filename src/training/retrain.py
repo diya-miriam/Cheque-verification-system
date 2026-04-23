@@ -91,8 +91,8 @@ def retrain(model_path: Path, feedback_dir: Path):
     model.to(device)
 
     # Freeze CNN
-    for param in model.cnn.parameters():
-        param.requires_grad = False
+    #for param in model.cnn.parameters():
+        #param.requires_grad = False
 
     model.cnn.eval()
     model.fc.train()
