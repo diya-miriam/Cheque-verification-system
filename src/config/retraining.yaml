@@ -1,0 +1,18 @@
+training:
+  max_epochs: 30
+  batch_size: 4
+  learning_rate: 1e-4
+  patience : 5
+  min_delta : 1e-4
+  df_length: 30
+
+model:
+  embedding_size: 256
+
+loss:
+  margins: 1.0
+
+paths:
+  train_csv: "data.csv"
+  pretrained_model: "src/models/checkpoints/verifier_siamese.pt"
+  save_model: "src/models/checkpoints"

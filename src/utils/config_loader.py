@@ -33,3 +33,4 @@ refsig_preprocessing: DictConfig=load_config("reference_signature_preprocessing"
 augmentation_cfg: DictConfig = load_config("augmentation")
 model_cfg: DictConfig = load_config("model")
 training_cfg: DictConfig = load_config("training")
+retraining_cfg: DictConfig = load_config("retraining")

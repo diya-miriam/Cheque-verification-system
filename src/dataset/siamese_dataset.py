@@ -19,8 +19,12 @@ class SiamesePairDataset(Dataset):
     def _get_image(self, rel_path: str):
         rel_path = Path(rel_path).as_posix()
 
-        raw_path = self.raw_root / rel_path
-        cache_path = self.cache_root / rel_path
+        if rel_path.startswith("feedback/"):
+            raw_path = Path("data") / rel_path
+            cache_path = Path("data/cache") / rel_path
+        else:
+            raw_path = self.raw_root / rel_path
+            cache_path = self.cache_root / rel_path
 
         roi = load_cached_roi(cache_path)
 

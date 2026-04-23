@@ -1,0 +1,4 @@
+writer_id,image1,image2,label
+1234,feedback/images/d0f01447-85e3-45c4-9a92-02facf74b206_roi.png,feedback/images/d0f01447-85e3-45c4-9a92-02facf74b206_ref.png,1
+5678,feedback/images/2ac885c9-4c98-417d-beee-0070fc9d4896_roi.png,feedback/images/2ac885c9-4c98-417d-beee-0070fc9d4896_ref.png,1
+8910,feedback/images/5a1532f9-fa41-4617-b3a7-af0e74cdb41b_roi.png,feedback/images/5a1532f9-fa41-4617-b3a7-af0e74cdb41b_ref.png,1

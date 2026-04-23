@@ -1,7 +1,9 @@
 from ultralytics import YOLO
 import torch
-
-MODEL_PATH = "src/models/checkpoints/roi_model.pt"
+from pathlib import Path
+#MODEL_PATH = "src/models/checkpoints/roi_model.pt"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MODEL_PATH = PROJECT_ROOT / "src" / "models" / "checkpoints" / "roi_model.pt"
 
 _roi_model = None
 

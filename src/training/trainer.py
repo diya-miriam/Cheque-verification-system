@@ -1,11 +1,13 @@
 import torch
 import mlflow
 from loguru import logger
-from evaluation.contrastive_loss import ContrastiveLoss
+from src.evaluation.contrastive_loss import ContrastiveLoss
 from src.evaluation.evaluate_model import evaluate
 from src.evaluation.evaluate_result import evaluate_classification
 from src.evaluation.metrics import log_confusion_matrix
-
+import json
+from pathlib import Path
+import time
 
 def train_model(
     model,
@@ -50,6 +52,10 @@ def train_model(
 
     best_val_loss = float("inf")
     epochs_without_improvement = 0
+    metrics_dir = Path("src/models/metrics")
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    model_name = Path(save_path).name
+    timestamp = int(time.time())
 
     for epoch in range(epochs):
         model.fc.train()
@@ -135,3 +141,28 @@ def train_model(
     logger.info(f"Confusion Matrix:\n{cm}")
 
     log_confusion_matrix(cm)
+
+    # --------------------------------------------------------
+    # Save metrics to JSON
+    # --------------------------------------------------------
+    metrics_data = {
+        "model_name": model_name,
+        "timestamp": timestamp,
+        "val": {
+            "loss": float(best_val_loss)
+        },
+        "test": {
+            "loss": float(test_loss),
+            "accuracy": float(metrics["accuracy"]),
+            "precision": float(metrics["precision"]),
+            "recall": float(metrics["recall"]),
+            "f1": float(metrics["f1"])
+        }
+    }
+
+    metrics_file = metrics_dir / f"{model_name.replace('.pt', '')}.json"
+
+    with open(metrics_file, "w") as f:
+        json.dump(metrics_data, f, indent=4)
+
+    logger.success(f"Metrics saved: {metrics_file}")
