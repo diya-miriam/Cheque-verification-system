@@ -1,8 +1,8 @@
 """
 ui/app6.py — Cheque Signature Verification UI (API-integrated)
 
-Verification is handled by the FastAPI backend (api_new.py).
-Feedback and retraining are handled directly — no session ID needed.
+Verification, feedback, and retraining are all handled by the FastAPI backend (api_new.py).
+The UI calls POST /verify (returns ROI as base64), then POST /feedback with the session_id.
 
 Start the API before running this UI:
     python -m uvicorn api_new:app --reload --port 8000
@@ -12,12 +12,10 @@ Then run:
 
 from __future__ import annotations
 
-import sys
-import uuid
-import time
-import tempfile
-import threading
+import base64
+import io
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -31,16 +29,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.utils.config_loader import retraining_cfg
-from src.utils.image_utils import resize_with_padding
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-API_BASE     = "http://127.0.0.1:8000"
-THRESHOLD    = 0.8
-FEEDBACK_DIR = PROJECT_ROOT / "data" / "feedback"
-FEEDBACK_CSV = FEEDBACK_DIR / "feedback_pairs.csv"
+API_BASE             = "http://127.0.0.1:8000"
+THRESHOLD            = 0.8
 MIN_FEEDBACK_SAMPLES = retraining_cfg.training.df_length
-
-MODEL_RELOAD_FLAG = threading.Event()
 
 # ── Session state ──────────────────────────────────────────────────────────────
 if "selected_model" not in st.session_state:
@@ -49,10 +42,6 @@ if "result" not in st.session_state:
     st.session_state.result = None
 if "writer_id" not in st.session_state:
     st.session_state.writer_id = ""
-
-if MODEL_RELOAD_FLAG.is_set():
-    MODEL_RELOAD_FLAG.clear()
-    st.rerun()
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -83,87 +72,6 @@ def get_available_models_from_api() -> list[str]:
     # Fallback: read from disk directly
     models_dir = PROJECT_ROOT / "src" / "models" / "checkpoints"
     return sorted([f.name for f in models_dir.glob("*.pt")])
-
-
-def get_current_model_path() -> Path:
-    return PROJECT_ROOT / "src" / "models" / "checkpoints" / st.session_state.selected_model
-
-
-# ── Feedback helpers (same as original app4.py — no API, no session ID) ────────
-
-def get_feedback_count() -> int:
-    if not FEEDBACK_CSV.exists():
-        return 0
-    try:
-        return len(pd.read_csv(FEEDBACK_CSV))
-    except Exception:
-        return 0
-
-
-def should_retrain() -> bool:
-    return get_feedback_count() >= MIN_FEEDBACK_SAMPLES
-
-
-def save_feedback(roi_pil: Image.Image, ref_pil: Image.Image, label: str):
-    """Save feedback directly to CSV — same logic as original app4.py."""
-    sample_id  = str(uuid.uuid4())
-    images_dir = FEEDBACK_DIR / "images"
-    images_dir.mkdir(parents=True, exist_ok=True)
-
-    roi_filename = f"{sample_id}_roi.png"
-    ref_filename = f"{sample_id}_ref.png"
-
-    roi_np = resize_with_padding(np.array(roi_pil.convert("L")), target_size=256)
-    ref_np = resize_with_padding(np.array(ref_pil.convert("L")), target_size=256)
-
-    Image.fromarray(roi_np.astype(np.uint8), mode="L").save(str(images_dir / roi_filename))
-    Image.fromarray(ref_np.astype(np.uint8), mode="L").save(str(images_dir / ref_filename))
-
-    new_row = {
-        "writer_id": st.session_state.get("writer_id", "unknown"),
-        "image1":    f"feedback/images/{roi_filename}",
-        "image2":    f"feedback/images/{ref_filename}",
-        "label":     0 if label == "GENUINE" else 1,
-    }
-
-    if FEEDBACK_CSV.exists():
-        try:
-            df = pd.read_csv(FEEDBACK_CSV)
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-        except pd.errors.EmptyDataError:
-            df = pd.DataFrame([new_row])
-    else:
-        FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
-        df = pd.DataFrame([new_row])
-
-    df.to_csv(FEEDBACK_CSV, index=False)
-    print(f"[INFO] Feedback saved: {FEEDBACK_CSV}")
-
-
-def trigger_retraining(model_path: Path):
-    """Trigger retraining in background — same logic as original app4.py."""
-    def run():
-        try:
-            from src.training.retrain import retrain
-            print("[INFO] Starting retraining...")
-            retrain(
-                model_path=model_path,
-                feedback_dir=PROJECT_ROOT / "data" / "feedback",
-            )
-            print("[INFO] Retraining completed.")
-
-            if FEEDBACK_CSV.exists():
-                timestamp    = int(time.time())
-                archive_path = FEEDBACK_CSV.parent / f"feedback_used_{timestamp}.csv"
-                FEEDBACK_CSV.rename(archive_path)
-                print(f"[INFO] Feedback archived: {archive_path.name}")
-
-            MODEL_RELOAD_FLAG.set()
-
-        except Exception as e:
-            print("[ERROR] Retraining failed:", e)
-
-    threading.Thread(target=run, daemon=True).start()
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -296,45 +204,15 @@ if mode == "🔍 Inference":
                 else:
                     data = resp.json()
 
-                    # Get the extracted ROI from the API response info
-                    # but keep original PIL images for display (same as app4.py)
-                    import io
-                    roi_display = Image.open(io.BytesIO(cheque_bytes)).convert("RGB")
-                    ref_display = Image.open(io.BytesIO(ref_bytes)).convert("RGB")
-
-                    # We also need the grayscale ROI for feedback saving
-                    # Re-run pipeline locally just for the ROI image
-                    from src.preprocessing.pipeline import PreprocessingPipeline
-                    from src.preprocessing.background_removal import remove_background
-
-                    pipeline = PreprocessingPipeline()
-                    suffix   = Path(cheque_file.name).suffix.lower() or ".png"
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                        tmp.write(cheque_bytes)
-                        tmp_path = tmp.name
-
-                    result = pipeline.run(tmp_path)
-                    if result.success and result.roi is not None:
-                        roi_np = result.roi
-                        if roi_np.ndim == 3:
-                            roi_np = roi_np[:, :, 0]
-                        roi_pil = Image.fromarray(roi_np.astype(np.uint8), mode="L")
-                    else:
-                        roi_pil = Image.open(io.BytesIO(cheque_bytes)).convert("L")
-
-                    ref_np  = np.array(Image.open(io.BytesIO(ref_bytes)).convert("L"), dtype=np.uint8)
-                    cleaned = remove_background(ref_np)
-                    if cleaned.dtype != np.uint8:
-                        cleaned = (cleaned * 255).clip(0, 255).astype(np.uint8)
-                    ref_pil = Image.fromarray(cleaned, mode="L")
+                    roi_pil = Image.open(io.BytesIO(base64.b64decode(data["roi_image_b64"]))).convert("L")
+                    ref_pil = Image.open(io.BytesIO(base64.b64decode(data["ref_image_b64"]))).convert("L")
 
                     st.session_state.result = {
-                        "label":    data["verdict"],
-                        "distance": data["distance"],
-                        "roi":      roi_pil,   # grayscale ROI for feedback
-                        "ref":      ref_pil,   # cleaned reference for feedback
-                        "roi_display": roi_display,  # colour for display
-                        "ref_display": ref_display,  # colour for display
+                        "label":      data["verdict"],
+                        "distance":   data["distance"],
+                        "roi":        roi_pil,
+                        "ref":        ref_pil,
+                        "session_id": data["session_id"],
                     }
                     st.rerun()
 
@@ -342,7 +220,7 @@ if mode == "🔍 Inference":
                 st.session_state.result = None
                 st.error(str(e))
 
-    # ── Feedback section (same as original app4.py) ────────────────────────────
+    # ── Feedback section ──────────────────────────────────────────────────────────
     if st.session_state.result is not None:
         st.divider()
         st.subheader("🧠 Provide Feedback")
@@ -357,19 +235,25 @@ if mode == "🔍 Inference":
 
         if st.button("💾 Save Feedback"):
             if corrected_label != predicted_label:
-                save_feedback(
-                    st.session_state.result["roi"],
-                    st.session_state.result["ref"],
-                    corrected_label,
+                fb_resp = requests.post(
+                    f"{API_BASE}/feedback",
+                    json={
+                        "session_id":    st.session_state.result["session_id"],
+                        "correct_label": corrected_label,
+                        "writer_id":     st.session_state.writer_id,
+                    },
                 )
-                count = get_feedback_count()
-
-                if should_retrain():
-                    trigger_retraining(get_current_model_path())
-                    st.success(f"Feedback saved! 🔄 Retraining triggered with {count} samples.")
+                if fb_resp.status_code == 404:
+                    st.error("Session expired. Please verify again before submitting feedback.")
+                elif fb_resp.status_code != 200:
+                    st.error(f"Feedback error: {fb_resp.json().get('detail', fb_resp.text)}")
                 else:
-                    st.success("Feedback saved successfully!")
-                    st.caption(f"Feedback count: {count}/{MIN_FEEDBACK_SAMPLES} samples needed for retraining.")
+                    fb_data = fb_resp.json()
+                    if fb_data.get("retraining_triggered"):
+                        st.success(f"Feedback saved! 🔄 Retraining triggered with {fb_data['feedback_count']} samples.")
+                    else:
+                        st.success("Feedback saved successfully!")
+                        st.caption(f"Feedback count: {fb_data['feedback_count']}/{MIN_FEEDBACK_SAMPLES} samples needed for retraining.")
             else:
                 st.info("Prediction is already correct. No feedback stored.")
 

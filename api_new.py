@@ -10,6 +10,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import base64
 import io
 import sys
 import uuid
@@ -129,6 +130,12 @@ def _to_tensor(img_np: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(roi).unsqueeze(0).unsqueeze(0)
 
 
+def _np_to_b64(img_np: np.ndarray) -> str:
+    buf = io.BytesIO()
+    Image.fromarray(img_np.astype(np.uint8), mode="L").save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
 def _compute_distance(model: SiameseNetwork, roi_np: np.ndarray, ref_np: np.ndarray) -> float:
     with torch.no_grad():
         e1, e2 = model(_to_tensor(roi_np), _to_tensor(ref_np))
@@ -239,6 +246,8 @@ class VerifyResponse(BaseModel):
     model_used: str
     feedback_count: int
     message: str
+    roi_image_b64: str
+    ref_image_b64: str
 
 
 class FeedbackRequest(BaseModel):
@@ -346,6 +355,8 @@ async def verify(
             model_used=model_name,
             feedback_count=_get_feedback_count(),
             message=f"Distance {distance:.4f} vs threshold {THRESHOLD}.",
+            roi_image_b64=_np_to_b64(roi_np),
+            ref_image_b64=_np_to_b64(ref_np),
         )
 
     except HTTPException:
